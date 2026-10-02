@@ -38,13 +38,13 @@ async function getTelegramLink(): Promise<string> {
 
 async function getSheetUrl(): Promise<string> {
   if (cachedSheetUrl) return cachedSheetUrl;
-  cachedSheetUrl = await getConfig("SHEET_API_URL");
+  cachedSheetUrl = Deno.env.get("SHEET_API_URL") || await getConfig("SHEET_API_URL");
   return cachedSheetUrl || SHEET_API_URL;
 }
 
 async function getSheetSecret(): Promise<string> {
   if (cachedSheetSecret) return cachedSheetSecret;
-  cachedSheetSecret = await getConfig("SHEET_API_SECRET");
+  cachedSheetSecret = Deno.env.get("SHEET_API_SECRET") || await getConfig("SHEET_API_SECRET");
   return cachedSheetSecret;
 }
 
