@@ -85,6 +85,7 @@ function barColor(band: string): string {
 export default function AtsModal({ onClose, onJoinCommunity }: { onClose: () => void; onJoinCommunity: () => void }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [fileName, setFileName] = useState('');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [cvText, setCvText] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [jobDesc, setJobDesc] = useState('');
@@ -126,8 +127,10 @@ export default function AtsModal({ onClose, onJoinCommunity }: { onClose: () => 
       const text = await extractText(file);
       if (!text.trim()) { setError('Could not read text from this file. If it is a scanned PDF, try a text-based PDF or DOCX.'); setPhase('idle'); return; }
       setCvText(text);
+      setUploadedFile(file);
       setPhase('idle');
     } catch (e) {
+      setUploadedFile(null);
       setPhase('idle');
       setError(e instanceof Error ? e.message : 'Could not read this file.');
     }
@@ -150,13 +153,26 @@ export default function AtsModal({ onClose, onJoinCommunity }: { onClose: () => 
     setError('');
     try {
       const job = [jobTitle.trim(), jobDesc.trim()].filter(Boolean).join('\n\n');
+      const cv = uploadedFile ? await new Promise<{ name: string; mime: string; base64: string }>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = String(reader.result || '');
+          resolve({
+            name: uploadedFile.name,
+            mime: uploadedFile.type || 'application/octet-stream',
+            base64: content.includes(',') ? content.split(',')[1] : content,
+          });
+        };
+        reader.onerror = () => reject(new Error('File read failed'));
+        reader.readAsDataURL(uploadedFile);
+      }) : null;
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ action: 'ats', text: cvText, job }),
+        body: JSON.stringify({ action: 'ats', text: cvText, job, cv }),
       });
       const responseText = await res.text();
       let data;
@@ -232,7 +248,7 @@ export default function AtsModal({ onClose, onJoinCommunity }: { onClose: () => 
                       <p className="text-sm font-bold text-[#163d3a]">{fileName}</p>
                       <p className="text-xs text-[#2e6d5d]">CV loaded — ready to check</p>
                     </div>
-                    <button onClick={() => { setCvText(''); setFileName(''); }} className="ml-2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                    <button onClick={() => { setCvText(''); setFileName(''); setUploadedFile(null); }} className="ml-2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                       <X className="h-4 w-4" />
                     </button>
                   </div>
@@ -276,7 +292,7 @@ export default function AtsModal({ onClose, onJoinCommunity }: { onClose: () => 
 
               <div className="flex items-start gap-2 rounded-xl bg-[#eaf1e8] px-4 py-3 text-xs text-[#2e6d5d]">
                 <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Your CV is not stored. Only the scores are logged anonymously.</span>
+                <span>Your CV and ATS results are saved to Drive and logged in the ATS sheet.</span>
               </div>
             </div>
           )}

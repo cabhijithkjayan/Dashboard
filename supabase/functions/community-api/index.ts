@@ -15,6 +15,7 @@ const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbynuDCXKQwsJuoOKG
 let cachedGeminiKey = "";
 let cachedTelegramLink = "";
 let cachedSheetUrl = "";
+let cachedSheetSecret = "";
 
 async function getConfig(key: string): Promise<string> {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -41,25 +42,30 @@ async function getSheetUrl(): Promise<string> {
   return cachedSheetUrl || SHEET_API_URL;
 }
 
-function buildUrlEncoded(fields: Record<string, string>): string {
-  return Object.entries(fields)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join("&");
+async function getSheetSecret(): Promise<string> {
+  if (cachedSheetSecret) return cachedSheetSecret;
+  cachedSheetSecret = await getConfig("SHEET_API_SECRET");
+  return cachedSheetSecret;
 }
 
 async function postToSheet(fields: Record<string, string>): Promise<void> {
   const sheetUrl = await getSheetUrl();
-  const body = buildUrlEncoded(fields);
+  const apiSecret = await getSheetSecret();
+  if (!apiSecret) throw new Error("Google Sheets sync is not configured");
+  const res = await fetch(sheetUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...fields, apiSecret }),
+  });
+  const responseText = await res.text();
+  let result: { ok?: boolean; error?: string };
   try {
-    const res = await fetch(sheetUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-      redirect: "manual",
-    });
-    console.log("Sheet response status:", res.status);
-  } catch (err) {
-    console.error("Google Sheets forwarding failed (non-blocking):", err.message);
+    result = JSON.parse(responseText);
+  } catch {
+    throw new Error("Google Sheets endpoint returned an invalid response");
+  }
+  if (!res.ok || !result.ok) {
+    throw new Error(result.error || `Google Sheets sync failed (${res.status})`);
   }
 }
 
@@ -88,14 +94,20 @@ async function forwardToSheet(data: SubmitData, cv: { name: string; mime: string
   if (cv) {
     fields.cvFileName = cv.name;
     fields.cvMime = cv.mime;
+    fields.cvBase64 = cv.base64;
   }
   await postToSheet(fields);
 }
 
-async function forwardAtsToSheet(atsResult: { ats?: { score?: number; band?: string }; roles?: { title: string; fit: number }[]; match?: { score?: number; band?: string } | null }): Promise<void> {
+async function forwardAtsToSheet(
+  atsResult: { ats?: { score?: number; band?: string }; roles?: { title: string; fit: number }[]; match?: { score?: number; band?: string } | null },
+  cv: { name: string; mime: string; base64: string } | null,
+  job: string,
+): Promise<void> {
   const roles = atsResult.roles || [];
   const fields: Record<string, string> = {
     action: "ats",
+    job,
     atsScore: String(atsResult.ats?.score ?? ""),
     atsBand: atsResult.ats?.band ?? "",
     role1: roles[0]?.title ?? "",
@@ -106,8 +118,14 @@ async function forwardAtsToSheet(atsResult: { ats?: { score?: number; band?: str
     role3Fit: String(roles[2]?.fit ?? ""),
     matchScore: String(atsResult.match?.score ?? ""),
     matchBand: atsResult.match?.band ?? "",
+    analysisJson: JSON.stringify(atsResult),
     timestamp: new Date().toISOString(),
   };
+  if (cv) {
+    fields.cvFileName = cv.name;
+    fields.cvMime = cv.mime;
+    fields.cvBase64 = cv.base64;
+  }
   await postToSheet(fields);
 }
 
@@ -255,15 +273,21 @@ async function handleSubmit(data: SubmitData, cv: { name: string; mime: string; 
   const { error } = await supabase.from("community_submissions").insert(row);
   if (error) throw new Error(`Database error: ${error.message}`);
 
-  await forwardToSheet(data, cv);
+  let sheetSynced = true;
+  try {
+    await forwardToSheet(data, cv);
+  } catch (err) {
+    sheetSynced = false;
+    console.error("Submission saved in Supabase, but Google sync failed:", err);
+  }
 
   const telegramLink = await getTelegramLink();
-  return new Response(JSON.stringify({ ok: true, telegramLink }), {
+  return new Response(JSON.stringify({ ok: true, telegramLink, sheetSynced }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-async function handleAts(cvText: string, job: string): Promise<Response> {
+async function handleAts(cvText: string, job: string, cv: { name: string; mime: string; base64: string } | null): Promise<Response> {
   const hasJob = job.trim().length > 0;
 
   const atsPrompt = `You are an ATS (Applicant Tracking System) CV analyzer. Analyze the CV text below and return ONLY a JSON object (no markdown, no code fences) with this exact structure:
@@ -315,7 +339,7 @@ ${cvText.substring(0, 15000)}`;
     result = JSON.parse(match[0]);
   }
 
-  await forwardAtsToSheet(result);
+  await forwardAtsToSheet(result, cv, job);
 
   return new Response(JSON.stringify({ ok: true, result }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -355,7 +379,7 @@ Deno.serve(async (req: Request) => {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return await handleAts(body.text, body.job || "");
+      return await handleAts(body.text, body.job || "", body.cv || null);
     }
 
     return new Response(JSON.stringify({ ok: false, error: "Unknown action" }), {

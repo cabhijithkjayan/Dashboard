@@ -78,6 +78,7 @@ export default function CommunityModal({ onClose }: { onClose: () => void }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [parseError, setParseError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [sheetWarning, setSheetWarning] = useState('');
   const [fileName, setFileName] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [cvText, setCvText] = useState('');
@@ -234,6 +235,7 @@ export default function CommunityModal({ onClose }: { onClose: () => void }) {
     if (!validate()) return;
     setPhase('submitting');
     setSubmitError('');
+    setSheetWarning('');
 
     try {
       const data = {
@@ -274,6 +276,9 @@ export default function CommunityModal({ onClose }: { onClose: () => void }) {
       try { result = JSON.parse(responseText); }
       catch { console.error('Submit response not JSON:', responseText.substring(0, 500)); throw new Error('Invalid response from server'); }
       if (!result.ok) throw new Error(result.error || 'Submit failed');
+      if (result.sheetSynced === false) {
+        setSheetWarning('Your submission is saved in the app, but could not be copied to Google Sheets or Drive. Please contact the site owner; do not submit again.');
+      }
       setPhase('success');
     } catch (err) {
       console.error('Submit error:', err);
@@ -290,7 +295,7 @@ export default function CommunityModal({ onClose }: { onClose: () => void }) {
 
   const reset = () => {
     setPhase('idle'); setForm(EMPTY_FORM); setCvFields(new Set());
-    setErrors({}); setParseError(''); setSubmitError(''); setFileName('');
+    setErrors({}); setParseError(''); setSubmitError(''); setSheetWarning(''); setFileName('');
     setUploadedFile(null); setCvText('');
     setSkillInput(''); setCertInput('');
   };
@@ -439,6 +444,7 @@ export default function CommunityModal({ onClose }: { onClose: () => void }) {
               <p className="mt-3 max-w-md text-sm leading-6 text-[#607871]">
                 Your details have been saved. We've also emailed you a confirmation with a link to join the community.
               </p>
+              {sheetWarning && <p role="alert" className="mt-4 max-w-md rounded-xl border border-[#e8bd73] bg-[#fff7e2] px-4 py-3 text-sm text-[#755515]">{sheetWarning}</p>}
               <a href={TELEGRAM_LINK} target="_blank" rel="noopener noreferrer" className="mt-8 inline-flex items-center gap-2 rounded-xl bg-[#c8942e] px-6 py-3.5 text-sm font-bold uppercase tracking-wider text-[#163d3a] transition hover:bg-[#e0b64f]">
                 <Send className="h-4 w-4" /> Join the community
               </a>
