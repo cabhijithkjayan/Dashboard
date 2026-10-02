@@ -10,11 +10,10 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
-const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbynuDCXKQwsJuoOKGe7_cqDyMy4uh5dOTnBqzJsDVecLqqwezBdjmjBgMrz0Ecid5b4ig/exec";
+const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwqhtEuJo6iABP6QIxND5DR1NUf5xKNZcz6i94csji3wKSGc-EHAteaAkKpRIEuVOJOmA/exec";
 
 let cachedGeminiKey = "";
 let cachedTelegramLink = "";
-let cachedSheetUrl = "";
 let cachedSheetSecret = "";
 
 async function getConfig(key: string): Promise<string> {
@@ -37,9 +36,7 @@ async function getTelegramLink(): Promise<string> {
 }
 
 async function getSheetUrl(): Promise<string> {
-  if (cachedSheetUrl) return cachedSheetUrl;
-  cachedSheetUrl = Deno.env.get("SHEET_API_URL") || await getConfig("SHEET_API_URL");
-  return cachedSheetUrl || SHEET_API_URL;
+  return Deno.env.get("SHEET_API_URL") || SHEET_API_URL;
 }
 
 async function getSheetSecret(): Promise<string> {
