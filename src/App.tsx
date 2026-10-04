@@ -34,7 +34,6 @@ import {
   Target,
   TrendingUp,
   Truck,
-  UserPlus,
   Users,
   WalletCards,
   X,
@@ -52,8 +51,6 @@ import type { LucideIcon } from 'lucide-react';
 import Resources from './resources';
 import { skillLogos, eduLogos, TallyLogo, ExcelLogo, PowerBILogo, MSOfficeLogo, ICAILogo, IGNOULogo, DPYLogo, WiproLogo, KalaLogo, GuptaLogo, BPLogo } from './logos';
 import type { FC } from 'react';
-import CommunityModal from './CommunityModal';
-import AtsModal from './AtsModal';
 
 type TabId =
   | 'overview'
@@ -252,8 +249,6 @@ function App() {
   const [auditOpen, setAuditOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
   const [cvOpen, setCvOpen] = useState(false);
-  const [communityOpen, setCommunityOpen] = useState(false);
-  const [atsOpen, setAtsOpen] = useState(false);
 
   const goTo = (id: TabId) => {
     setActiveTab(id);
@@ -264,7 +259,6 @@ function App() {
   return (
     <div className="min-h-screen bg-[#f7f8f5] text-[#163d3a]">
       <Hero onNavigate={goTo} onViewCv={() => setCvOpen(true)} />
-      <CommunityBanner onJoinForm={() => setCommunityOpen(true)} onJoinAts={() => setAtsOpen(true)} />
       <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-6">
         <aside className="sticky top-0 z-40 border-b border-[#dfe6de] bg-[#f7f8f5]/95 shadow-sm backdrop-blur-xl lg:min-h-screen lg:border-b-0 lg:border-r lg:shadow-none">
           <div className="mx-auto flex max-w-[1440px] items-center gap-2 px-4 py-2 sm:px-8 lg:mx-0 lg:flex-col lg:items-stretch lg:gap-5 lg:px-4 lg:py-6">
@@ -300,8 +294,6 @@ function App() {
       <Footer onContact={() => setContactOpen(true)} onNavigate={goTo} onViewCv={() => setCvOpen(true)} />
       {cvOpen && <CvViewer onClose={() => setCvOpen(false)} />}
       {contactOpen && <ContactModal onClose={() => setContactOpen(false)} />}
-      {communityOpen && <CommunityModal onClose={() => setCommunityOpen(false)} />}
-      {atsOpen && <AtsModal onClose={() => setAtsOpen(false)} onJoinCommunity={() => { setAtsOpen(false); setCommunityOpen(true); }} />}
     </div>
   );
 }
@@ -333,62 +325,6 @@ function Hero({ onNavigate, onViewCv }: { onNavigate: (id: TabId) => void; onVie
       </div>
     </div>
   </header>;
-}
-
-function CommunityBanner({ onJoinForm, onJoinAts }: { onJoinForm: () => void; onJoinAts: () => void }) {
-  const [expanded, setExpanded] = useState(false);
-  return <section className="bg-[#f7f8f5]">
-    <div className="mx-auto max-w-[1440px] px-5 py-3 sm:px-10 lg:py-4">
-      <button onClick={() => setExpanded((o) => !o)} className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-2xl border border-[#c8942e]/40 bg-[#fff7e2] px-5 py-4 text-left transition hover:border-[#c8942e] hover:shadow-md sm:px-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#163d3a] text-[#e0b64f]">
-            <Users className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#8a651a]">Community</p>
-            <h2 className="text-lg font-extrabold tracking-tight text-[#163d3a] sm:text-xl lg:text-2xl">JOIN ABHI'S: JOB REFERENCE COMMUNITY</h2>
-          </div>
-        </div>
-        <ChevronDown className={`h-6 w-6 shrink-0 text-[#8a651a] transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
-      </button>
-      <div className={`grid transition-all duration-300 ease-in-out ${expanded ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-        <div className="overflow-hidden">
-          <p className="mx-auto mb-5 max-w-2xl text-center text-xs leading-5 text-[#607871] sm:text-sm">Two ways to join — fill a quick form or check your CV with our free ATS checker first. Both take under 3 minutes.</p>
-          <div className="grid gap-4 md:grid-cols-2 lg:gap-5">
-        {/* Plan A — Form */}
-        <div className="group relative overflow-hidden rounded-2xl border border-[#dfe6de] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-[#c8942e] hover:shadow-xl sm:p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#163d3a] text-[#e0b64f]"><UserPlus className="h-5 w-5" /></div>
-          <h3 className="mt-4 text-base font-extrabold tracking-tight text-[#163d3a] sm:text-lg">Member Sign-up Form</h3>
-          <p className="mt-2 text-xs leading-5 text-[#607871]">Upload your CV to auto-fill the form, or fill it manually. Your details are saved to Abhi's member pool for job referrals and references.</p>
-          <ul className="mt-4 space-y-1.5">
-            {['CV auto-fill in seconds', '18 fields, all editable', 'Confirmation email sent instantly', 'Join the Telegram community'].map((item) => (
-              <li key={item} className="flex items-center gap-2 text-[11px] font-semibold text-[#55706b]"><Check className="h-3.5 w-3.5 shrink-0 text-[#2e6d5d]" /> {item}</li>
-            ))}
-          </ul>
-          <button onClick={onJoinForm} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#163d3a] px-4 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#2e6d5d]">
-            <UserPlus className="h-4 w-4 text-[#e0b64f]" /> Join with form <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        {/* Plan B — ATS */}
-        <div className="group relative overflow-hidden rounded-2xl border border-[#dfe6de] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-[#c8942e] hover:shadow-xl sm:p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#c8942e] text-[#163d3a]"><Target className="h-5 w-5" /></div>
-          <h3 className="mt-4 text-base font-extrabold tracking-tight text-[#163d3a] sm:text-lg">Free ATS CV Checker</h3>
-          <p className="mt-2 text-xs leading-5 text-[#607871]">Upload your CV and get an instant ATS score, best-fit job roles, and an optional job-match score. No sign-up needed.</p>
-          <ul className="mt-4 space-y-1.5">
-            {['ATS score out of 100 with breakdown', 'Top 3 best-fit job roles', 'Job-match score with specific fixes', 'Jump to the member form when ready'].map((item) => (
-              <li key={item} className="flex items-center gap-2 text-[11px] font-semibold text-[#55706b]"><Check className="h-3.5 w-3.5 shrink-0 text-[#c8942e]" /> {item}</li>
-            ))}
-          </ul>
-          <button onClick={onJoinAts} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#c8942e] px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#163d3a] transition hover:bg-[#e0b64f]">
-            <Target className="h-4 w-4" /> Check my CV <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-          </div>
-          <p className="mt-4 text-center text-[11px] text-[#71837b]">Your data is stored privately and used only to contact you about references and opportunities. To remove your data, email cabhijithkjayan@gmail.com.</p>
-        </div>
-      </div>
-    </div>
-  </section>;
 }
 
 function SocialButton({ href, label, icon: Icon, external = false }: { href: string; label: string; icon: LucideIcon; external?: boolean }) {
