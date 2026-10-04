@@ -82,7 +82,7 @@ function barColor(band: string): string {
   return 'bg-[#b03820]';
 }
 
-export default function AtsModal({ onClose, onJoinCommunity }: { onClose: () => void; onJoinCommunity: () => void }) {
+export default function AtsModal({ onClose, onJoinCommunity }: { onClose: () => void; onJoinCommunity?: () => void }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [fileName, setFileName] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -462,9 +462,9 @@ export default function AtsModal({ onClose, onJoinCommunity }: { onClose: () => 
                 <button onClick={clearJob} className="flex items-center justify-center gap-2 rounded-xl border border-[#dfe6de] bg-white px-5 py-3 text-xs font-bold uppercase tracking-wider text-[#607871] transition hover:bg-[#f8faf7]">
                   <RotateCcw className="h-4 w-4" /> Check another job
                 </button>
-                <button onClick={onJoinCommunity} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#c8942e] px-5 py-3 text-xs font-bold uppercase tracking-wider text-[#163d3a] transition hover:bg-[#e0b64f]">
+                {onJoinCommunity && <button onClick={onJoinCommunity} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#c8942e] px-5 py-3 text-xs font-bold uppercase tracking-wider text-[#163d3a] transition hover:bg-[#e0b64f]">
                   <Users className="h-4 w-4" /> Join Abhi's Reference Community
-                </button>
+                </button>}
               </div>
             </div>
           )}
