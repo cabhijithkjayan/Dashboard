@@ -51,6 +51,8 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import Resources from './resources';
 import AtsModal from './AtsModal';
+import AdminPanel, { SettingsButton, trackVisit } from './AdminPanel';
+import type { CvInfo } from './AdminPanel';
 import { skillLogos, eduLogos, TallyLogo, ExcelLogo, PowerBILogo, MSOfficeLogo, ICAILogo, IGNOULogo, DPYLogo, WiproLogo, KalaLogo, GuptaLogo, BPLogo } from './logos';
 import type { FC } from 'react';
 
@@ -251,6 +253,12 @@ function App() {
   const [auditOpen, setAuditOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
   const [cvOpen, setCvOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cv, setCv] = useState<CvInfo | null>(null);
+
+  useEffect(() => {
+    trackVisit().then((current) => { if (current) setCv(current); });
+  }, []);
 
   const goTo = (id: TabId) => {
     setActiveTab(id);
@@ -260,7 +268,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#f7f8f5] text-[#163d3a]">
-      <Hero onNavigate={goTo} onViewCv={() => setCvOpen(true)} />
+      <Hero onNavigate={goTo} onViewCv={() => setCvOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
       <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-6">
         <aside className="sticky top-0 z-40 border-b border-[#dfe6de] bg-[#f7f8f5]/95 shadow-sm backdrop-blur-xl lg:min-h-screen lg:border-b-0 lg:border-r lg:shadow-none">
           <div className="mx-auto flex max-w-[1440px] items-center gap-2 px-4 py-2 sm:px-8 lg:mx-0 lg:flex-col lg:items-stretch lg:gap-5 lg:px-4 lg:py-6">
@@ -294,13 +302,14 @@ function App() {
       </div>
 
       <Footer onContact={() => setContactOpen(true)} onNavigate={goTo} onViewCv={() => setCvOpen(true)} />
-      {cvOpen && <CvViewer onClose={() => setCvOpen(false)} />}
+      {cvOpen && <CvViewer cvUrl={cv?.url ?? links.cv} fileName={cv?.fileName ?? 'Abhijith_K_Jayan_AFAM.pdf'} onClose={() => setCvOpen(false)} />}
+      {settingsOpen && <AdminPanel onClose={() => setSettingsOpen(false)} onCvUpdated={setCv} />}
       {contactOpen && <ContactModal onClose={() => setContactOpen(false)} />}
     </div>
   );
 }
 
-function Hero({ onNavigate, onViewCv }: { onNavigate: (id: TabId) => void; onViewCv: () => void }) {
+function Hero({ onNavigate, onViewCv, onOpenSettings }: { onNavigate: (id: TabId) => void; onViewCv: () => void; onOpenSettings: () => void }) {
   return <header className="relative overflow-hidden bg-[#eaf1e8]">
     <div className="hero-map" aria-hidden="true"><div className="route route-one" /><div className="route route-two" /><div className="route route-three" /><Ship className="ship-icon" /><Plane className="plane-icon" /><span className="particle particle-one" /><span className="particle particle-two" /><span className="particle particle-three" /></div>
     <div className="absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
@@ -312,7 +321,7 @@ function Hero({ onNavigate, onViewCv }: { onNavigate: (id: TabId) => void; onVie
       </div>
     </div>
     <div className="relative mx-auto max-w-[1440px] px-5 pb-8 pt-4 sm:px-10 lg:pb-10 lg:pt-5">
-      <div className="flex items-center justify-between border-b border-[#cbd9cb] pb-5"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#163d3a] text-[#e0b64f]"><Globe2 className="h-5 w-5" /></div><div><p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#2e6d5d]">Professional Portfolio</p><p className="text-sm font-bold tracking-wide text-[#163d3a]">ABHIJITH K JAYAN</p></div></div><div className="hidden items-center gap-2 text-xs font-semibold text-[#55706b] sm:flex"><MapPin className="h-4 w-4 text-[#c8942e]" /> Dubai, UAE</div></div>
+      <div className="flex items-center justify-between border-b border-[#cbd9cb] pb-5"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#163d3a] text-[#e0b64f]"><Globe2 className="h-5 w-5" /></div><div><p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#2e6d5d]">Professional Portfolio</p><p className="text-sm font-bold tracking-wide text-[#163d3a]">ABHIJITH K JAYAN</p></div></div><div className="flex items-center gap-4"><div className="hidden items-center gap-2 text-xs font-semibold text-[#55706b] sm:flex"><MapPin className="h-4 w-4 text-[#c8942e]" /> Dubai, UAE</div><SettingsButton onClick={onOpenSettings} /></div></div>
       <div className="grid items-center gap-6 pt-6 lg:grid-cols-[1.25fr_0.75fr] lg:pt-7"><div className="relative z-10"><div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#c8942e]/40 bg-white/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-[#8a651a]"><Sparkles className="h-3.5 w-3.5" /> Finance · AI · Automation</div><h1 className="max-w-4xl text-5xl font-extrabold leading-[0.98] tracking-[-0.05em] text-[#163d3a] sm:text-7xl lg:text-8xl">ABHIJITH<br /><span className="text-[#c8942e]">K JAYAN</span></h1><p className="mt-7 max-w-3xl text-base font-semibold leading-7 text-[#2e6d5d] sm:text-xl">Building smarter finance systems <span className="text-[#c8942e]">|</span> Finance, AI & Automation <span className="text-[#c8942e]">|</span> Audit & Compliance</p><p className="mt-4 text-sm font-bold uppercase tracking-[0.18em] text-[#55706b] sm:text-base">Automate <span className="text-[#c8942e]">•</span> Integrate <span className="text-[#c8942e]">•</span> Build <span className="text-[#c8942e]">•</span> Optimize</p><div className="mt-8 flex flex-wrap gap-3"><SocialButton href={links.linkedin} label="LinkedIn" icon={Linkedin} external /><SocialButton href={links.instagram} label="Instagram" icon={Instagram} external /><SocialButton href={links.linktree} label="Linktree" icon={Link2} external /><SocialButton href={links.email} label="Email Me" icon={Mail} /><SocialButton href={links.phone} label="Call Me" icon={Phone} /><SocialButton href={links.whatsapp} label="WhatsApp" icon={MessageCircle} external /><button onClick={onViewCv} className="inline-flex items-center gap-2 rounded-xl bg-[#163d3a] px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#2e6d5d]"><Eye className="h-4 w-4" /> View CV</button></div><button onClick={() => onNavigate('overview')} className="mt-8 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#2e6d5d] hover:text-[#c8942e]">Explore the profile <ArrowRight className="h-4 w-4" /></button></div><div className="relative mx-auto w-full max-w-[290px] lg:justify-self-end"><div className="absolute -inset-6 rounded-[2rem] border border-[#c8942e]/30 rotate-3" /><div className="relative overflow-hidden rounded-[1.75rem] border-[10px] border-white bg-[#c8942e] shadow-2xl transition duration-500 hover:-translate-y-2 hover:rotate-1"><img src="/profile-photo.jpg" alt="Abhijith K Jayan" className="aspect-[4/5] w-full object-cover object-top" /></div><div className="absolute -bottom-5 -left-6 rounded-2xl bg-[#163d3a] px-4 py-3 text-white shadow-xl"><p className="text-[10px] font-bold uppercase tracking-widest text-[#e0b64f]">Focus</p><p className="mt-1 text-sm font-semibold">Finance + AI + Automation</p></div></div></div>
     </div>
     <div className="relative border-t border-[#cbd9cb] bg-white/40 py-4">
@@ -483,8 +492,8 @@ function LanguagesSection() {
   return <div className="space-y-6"><Reveal><SectionHeader eyebrow="Languages" title="Communicating across markets and teams." text="Multilingual capability shaped by work across Indian and UAE/GCC business environments." icon={Languages} /></Reveal><Reveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{languages.map(({ name, level, detail, icon: Icon }) => <div key={name} className="group rounded-3xl border border-[#dfe6de] bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eaf1e8] text-[#2e6d5d]"><Icon className="h-5 w-5" /></span><h3 className="mt-5 text-xl font-extrabold text-[#163d3a]">{name}</h3><p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#c8942e]">{level}</p><p className="mt-3 text-sm leading-6 text-[#607871]">{detail}</p></div>)}</Reveal></div>;
 }
 
-function CvViewer({ onClose }: { onClose: () => void }) {
-  return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0f2929]/80 p-4 backdrop-blur-sm" onClick={onClose}><div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between border-b border-[#dfe6de] bg-[#f7f8f5] px-5 py-3"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#163d3a] text-[#e0b64f]"><FileText className="h-4 w-4" /></div><div><p className="text-sm font-extrabold text-[#163d3a]">Abhijith K Jayan — CV</p><p className="text-[10px] font-bold uppercase tracking-wider text-[#71837b]">Finance Management</p></div></div><div className="flex items-center gap-2"><a href={links.cv} download="Abhijith_K_Jayan_AFAM.pdf" className="inline-flex items-center gap-2 rounded-xl bg-[#c8942e] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[#163d3a] transition hover:bg-[#e0b64f]"><Download className="h-4 w-4" /> Download</a><button onClick={onClose} className="rounded-lg p-2.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label="Close CV viewer"><X className="h-5 w-5" /></button></div></div><div className="flex-1 overflow-hidden bg-[#f0f0f0]"><iframe src={`${links.cv}#toolbar=1&navpanes=0&view=FitH`} title="Abhijith K Jayan CV" className="h-full w-full border-0" /></div></div></div>;
+function CvViewer({ cvUrl, fileName, onClose }: { cvUrl: string; fileName: string; onClose: () => void }) {
+  return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0f2929]/80 p-4 backdrop-blur-sm" onClick={onClose}><div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between border-b border-[#dfe6de] bg-[#f7f8f5] px-5 py-3"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#163d3a] text-[#e0b64f]"><FileText className="h-4 w-4" /></div><div><p className="text-sm font-extrabold text-[#163d3a]">Abhijith K Jayan — CV</p><p className="text-[10px] font-bold uppercase tracking-wider text-[#71837b]">Finance Management</p></div></div><div className="flex items-center gap-2"><a href={cvUrl} download={fileName} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-[#c8942e] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[#163d3a] transition hover:bg-[#e0b64f]"><Download className="h-4 w-4" /> Download</a><button onClick={onClose} className="rounded-lg p-2.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label="Close CV viewer"><X className="h-5 w-5" /></button></div></div><div className="flex-1 overflow-hidden bg-[#f0f0f0]"><iframe src={`${cvUrl}#toolbar=1&navpanes=0&view=FitH`} title="Abhijith K Jayan CV" className="h-full w-full border-0" /></div></div></div>;
 }
 
 function ContactModal({ onClose }: { onClose: () => void }) {

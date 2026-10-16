@@ -343,6 +343,131 @@ ${cvText.substring(0, 15000)}`;
   });
 }
 
+// ── Profile visits, admin login and CV replacement ─────────────────────────
+
+const CV_BUCKET = "cv";
+const CV_OBJECT = "current.pdf";
+const MAX_CV_BYTES = 10 * 1024 * 1024;
+const ADMIN_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+
+function json(value: unknown, status = 200): Response {
+  return new Response(JSON.stringify(value), {
+    status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function getAdminCredentials(): Promise<{ username: string; password: string }> {
+  const username = Deno.env.get("ADMIN_USERNAME") || await getConfig("ADMIN_USERNAME");
+  const password = Deno.env.get("ADMIN_PASSWORD") || await getConfig("ADMIN_PASSWORD");
+  return { username, password };
+}
+
+async function hmac(message: string): Promise<string> {
+  const { password } = await getAdminCredentials();
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(`${SUPABASE_SERVICE_ROLE_KEY}:${password}`),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function verifyAdminToken(token: unknown): Promise<boolean> {
+  if (typeof token !== "string" || !token.includes(".")) return false;
+  const [exp, sig] = token.split(".");
+  if (!exp || !sig || Number(exp) < Date.now()) return false;
+  return safeEqual(sig, await hmac(`admin:${exp}`));
+}
+
+async function handleAdminLogin(username: unknown, password: unknown): Promise<Response> {
+  const creds = await getAdminCredentials();
+  if (!creds.username || !creds.password) {
+    return json({ ok: false, error: "Admin login is not configured on the server" }, 500);
+  }
+  const userOk = safeEqual(String(username ?? "").trim().toLowerCase(), creds.username.trim().toLowerCase());
+  const passOk = safeEqual(String(password ?? ""), creds.password);
+  if (!userOk || !passOk) {
+    await new Promise((r) => setTimeout(r, 800));
+    return json({ ok: false, error: "Invalid username or password" }, 401);
+  }
+  const exp = String(Date.now() + ADMIN_TOKEN_TTL_MS);
+  return json({ ok: true, token: `${exp}.${await hmac(`admin:${exp}`)}` });
+}
+
+type CvInfo = { url: string; fileName: string; updatedAt: string; size: number } | null;
+
+async function getCvInfo(): Promise<CvInfo> {
+  const raw = await getConfig("CV_CURRENT");
+  if (!raw) return null;
+  try {
+    const meta = JSON.parse(raw);
+    const url = `${SUPABASE_URL}/storage/v1/object/public/${CV_BUCKET}/${CV_OBJECT}?v=${encodeURIComponent(meta.updatedAt)}`;
+    return { url, fileName: meta.fileName, updatedAt: meta.updatedAt, size: meta.size };
+  } catch {
+    return null;
+  }
+}
+
+async function handleVisit(req: Request, body: { visitorId?: string; referrer?: string; region?: string; count?: boolean }): Promise<Response> {
+  if (body.count !== false && typeof body.visitorId === "string" && body.visitorId.length <= 64) {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const headerCountry = req.headers.get("cf-ipcountry") || req.headers.get("x-country-code") || "";
+    const { error } = await supabase.from("profile_visits").insert({
+      visitor_id: body.visitorId,
+      referrer: String(body.referrer || "").slice(0, 200),
+      user_agent: (req.headers.get("user-agent") || "").slice(0, 400),
+      country: (headerCountry && headerCountry !== "XX" ? headerCountry : String(body.region || "")).slice(0, 80),
+    });
+    if (error) console.error("Visit insert failed:", error.message);
+  }
+  return json({ ok: true, cv: await getCvInfo() });
+}
+
+async function handleAdminStats(): Promise<Response> {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data, error } = await supabase.rpc("profile_visit_stats", { tz: "Asia/Dubai" });
+  if (error) throw new Error(`Stats error: ${error.message}`);
+  return json({ ok: true, stats: data, cv: await getCvInfo() });
+}
+
+async function handleAdminUploadCv(cv: { name?: string; mime?: string; base64?: string } | undefined): Promise<Response> {
+  if (!cv?.base64 || !cv.name) return json({ ok: false, error: "Missing CV file" }, 400);
+  const isPdf = cv.mime === "application/pdf" || cv.name.toLowerCase().endsWith(".pdf");
+  if (!isPdf) return json({ ok: false, error: "Only PDF files are supported" }, 400);
+  const bytes = Uint8Array.from(atob(cv.base64), (c) => c.charCodeAt(0));
+  if (bytes.length > MAX_CV_BYTES) return json({ ok: false, error: "File is larger than 10 MB" }, 400);
+  if (String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") return json({ ok: false, error: "File is not a valid PDF" }, 400);
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: bucket } = await supabase.storage.getBucket(CV_BUCKET);
+  if (!bucket) {
+    const { error: bucketError } = await supabase.storage.createBucket(CV_BUCKET, { public: true });
+    if (bucketError && !/already exists/i.test(bucketError.message)) throw new Error(`Storage error: ${bucketError.message}`);
+  }
+  const { error: uploadError } = await supabase.storage.from(CV_BUCKET).upload(CV_OBJECT, bytes, {
+    contentType: "application/pdf", upsert: true, cacheControl: "60",
+  });
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  const meta = {
+    fileName: cv.name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120),
+    updatedAt: new Date().toISOString(),
+    size: bytes.length,
+  };
+  const { error: configError } = await supabase.from("app_config").upsert({
+    key: "CV_CURRENT", value: JSON.stringify(meta), updated_at: meta.updatedAt,
+  });
+  if (configError) throw new Error(`Could not save CV details: ${configError.message}`);
+  return json({ ok: true, cv: await getCvInfo() });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -377,6 +502,15 @@ Deno.serve(async (req: Request) => {
         });
       }
       return await handleAts(body.text, body.job || "", body.cv || null);
+    }
+
+    if (action === "visit") return await handleVisit(req, body);
+    if (action === "admin-login") return await handleAdminLogin(body.username, body.password);
+
+    if (action === "admin-stats" || action === "admin-upload-cv") {
+      if (!(await verifyAdminToken(body.token))) return json({ ok: false, error: "Session expired. Please sign in again." }, 401);
+      if (action === "admin-stats") return await handleAdminStats();
+      return await handleAdminUploadCv(body.cv);
     }
 
     return new Response(JSON.stringify({ ok: false, error: "Unknown action" }), {
